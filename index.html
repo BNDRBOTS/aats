@@ -453,22 +453,18 @@
         ::-webkit-scrollbar-track { background: var(--bg-base); }
         ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--border-subtle); }
-
     </style>
 </head>
 <body>
-
     <div id="ambient-glow"></div>
 
     <div class="app-container">
-        <!-- Left Canvas Area -->
         <main class="canvas-area">
             <header class="header">
                 <h1>Aura.</h1>
                 <p>Enterprise Audio Intelligence & Synthesis</p>
             </header>
 
-            <!-- Upload View -->
             <div id="upload-view" style="display: flex; flex-direction: column; flex-grow: 1;">
                 <div class="dropzone-container" id="dropzone" role="button" tabindex="0" aria-label="Upload audio or video files">
                     <div class="dropzone-content">
@@ -480,24 +476,18 @@
                     </div>
                     <input type="file" id="file-input" multiple accept="audio/*,video/*">
                 </div>
-                
                 <div class="file-list" id="file-list"></div>
             </div>
 
-            <!-- Processing / Results View -->
             <div id="processing-view" class="processing-view">
                 <div class="header" style="margin-bottom: 2rem;">
                     <h1 style="font-size: 1.5rem;">Intelligence Feed</h1>
                     <p>Live processing and transcription</p>
                 </div>
-                
-                <div id="transcription-container" style="display: flex; flex-direction: column; gap: 2rem;">
-                    <!-- Transcription blocks injected here -->
-                </div>
+                <div id="transcription-container" style="display: flex; flex-direction: column; gap: 2rem;"></div>
             </div>
         </main>
 
-        <!-- Right Control Panel -->
         <aside class="control-panel">
             <div class="panel-section">
                 <div class="panel-title">Model Selection</div>
@@ -540,9 +530,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                     Initialize Processing
                 </button>
-                <button class="tertiary-btn hidden" id="reset-btn" style="margin-top: 1rem; width: 100%;">
-                    Process New Batch
-                </button>
+                <button class="tertiary-btn hidden" id="reset-btn" style="margin-top: 1rem; width: 100%;">Process New Batch</button>
             </div>
 
             <div class="panel-section">
@@ -556,18 +544,16 @@
     </div>
 
     <script>
-        // Core State
         const state = {
             files: [],
             isProcessing: false,
             apiKey: '',
-            model: '', // will be set from the select element
+            model: document.getElementById('model-select').value,
             chunkSizeMB: 25,
             diarization: true,
             results: {}
         };
 
-        // DOM Elements
         const elements = {
             glow: document.getElementById('ambient-glow'),
             dropzone: document.getElementById('dropzone'),
@@ -586,17 +572,10 @@
             logs: document.getElementById('system-logs')
         };
 
-        // Synchronize model state with the actual selected option
-        state.model = elements.modelSelect.value;
-
-        // --- UI Interactions & Visuals ---
-
-        // Ambient Glow Tracking
         document.addEventListener('mousemove', (e) => {
             elements.glow.style.transform = `translate(${e.clientX - 300}px, ${e.clientY - 300}px)`;
         });
 
-        // Logger
         function log(message, type = 'info') {
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
@@ -606,8 +585,6 @@
             elements.logs.scrollTop = elements.logs.scrollHeight;
         }
 
-        // --- Settings Event Listeners ---
-
         elements.modelSelect.addEventListener('change', (e) => { state.model = e.target.value; log(`Model set to ${state.model}`); });
         elements.apiKeyInput.addEventListener('input', (e) => { state.apiKey = e.target.value; });
         elements.chunkSizeSlider.addEventListener('input', (e) => {
@@ -616,16 +593,12 @@
         });
         elements.diarizationCheck.addEventListener('change', (e) => { state.diarization = e.target.checked; });
 
-        // --- Drag & Drop / File Handling ---
-
         function updateFileList() {
             elements.fileList.innerHTML = '';
             state.files.forEach((file, index) => {
                 const item = document.createElement('div');
                 item.className = 'file-item';
-                
                 const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                
                 item.innerHTML = `
                     <div class="file-info">
                         <span class="file-name">${file.name}</span>
@@ -635,8 +608,6 @@
                 `;
                 elements.fileList.appendChild(item);
             });
-
-            // Bind remove buttons
             document.querySelectorAll('.remove-file').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const idx = parseInt(e.target.dataset.index);
@@ -646,109 +617,83 @@
                     validateState();
                 });
             });
-
             validateState();
         }
 
         function validateState() {
-            if (state.files.length > 0 && !state.isProcessing) {
-                elements.startBtn.disabled = false;
-            } else {
-                elements.startBtn.disabled = true;
-            }
+            elements.startBtn.disabled = !(state.files.length > 0 && !state.isProcessing);
         }
 
         function handleFiles(files) {
             const validFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.type.startsWith('video/'));
-            if(validFiles.length !== files.length) {
-                log('Some files ignored. Only audio/video supported.', 'warn');
-            }
+            if (validFiles.length !== files.length) log('Some files ignored. Only audio/video supported.', 'warn');
             state.files = [...state.files, ...validFiles];
             validFiles.forEach(f => log(`Queued: ${f.name}`));
             updateFileList();
         }
 
-        // Dropzone events – including keyboard activation
-        elements.dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            elements.dropzone.classList.add('dragover');
-        });
+        elements.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); elements.dropzone.classList.add('dragover'); });
+        elements.dropzone.addEventListener('dragleave', () => { elements.dropzone.classList.remove('dragover'); });
+        elements.dropzone.addEventListener('drop', (e) => { e.preventDefault(); elements.dropzone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        elements.dropzone.addEventListener('click', () => { elements.fileInput.click(); });
+        elements.dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); elements.fileInput.click(); } });
+        elements.fileInput.addEventListener('change', (e) => { handleFiles(e.target.files); e.target.value = ''; });
 
-        elements.dropzone.addEventListener('dragleave', () => {
-            elements.dropzone.classList.remove('dragover');
-        });
-
-        elements.dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            elements.dropzone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
-        });
-
-        elements.dropzone.addEventListener('click', () => {
-            elements.fileInput.click();
-        });
-
-        elements.dropzone.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                elements.fileInput.click();
-            }
-        });
-
-        elements.fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-            e.target.value = ''; // Reset
-        });
-
-        // --- Processing Logic & Synthetic Intelligence Mock ---
-
-        // Mock transcription responses
-        const mockResponses = {
-            general: [
-                "The systemic anomalies detected in quadrant four represent a substantial shift.",
-                "Moving forward, we need to optimize our integration strategies at scale.",
-                "If we cross-reference the data structures, the latency drops by roughly forty percent.",
-                "Our heuristic analysis confirms the initial hypothesis.",
-                "Let's break this down into actionable chunks for the engineering team."
-            ]
+        // ---------- REAL API INTEGRATION ----------
+        const MODEL_API_MAP = {
+            'sonnet-4-6': { provider: 'anthropic', model: 'claude-sonnet-4-20250514', endpoint: '/api/transcribe/anthropic' },
+            'opus-4-6': { provider: 'anthropic', model: 'claude-opus-4-20250514', endpoint: '/api/transcribe/anthropic' },
+            'gpt-5-3-instant': { provider: 'openai', model: 'gpt-5.3-instant', endpoint: '/api/transcribe/openai' },
+            'gpt-5-4-thinking': { provider: 'openai', model: 'gpt-5.4-thinking', endpoint: '/api/transcribe/openai' },
+            'deepseek-v3': { provider: 'deepseek', model: 'deepseek-chat', endpoint: '/api/transcribe/deepseek' }
         };
 
-        const generateMockSegment = (chunkIndex, isDiarized) => {
-            const txt = mockResponses.general[Math.floor(Math.random() * mockResponses.general.length)];
-            const speaker = isDiarized ? `[SPEAKER ${Math.floor(Math.random() * 3) + 1}]` : '';
-            return {
-                text: `${speaker ? `<span class="speaker-tag">${speaker}</span>` : ''} ${txt} `,
-                rawText: `${speaker ? speaker : ''} ${txt} `
-            };
-        };
-
-        const simulateApiCall = async (file, chunkIndex, totalChunks, containerId, model, key) => {
-            // Simulate network latency (2-4 seconds per chunk)
-            const delay = Math.random() * 2000 + 2000;
-            await new Promise(resolve => setTimeout(resolve, delay));
+        async function sendChunkForTranscription(file, chunkIndex, totalChunks, fileId, modelKey, apiKey) {
+            const chunkSizeBytes = state.chunkSizeMB * 1024 * 1024;
+            const start = chunkIndex * chunkSizeBytes;
+            const end = Math.min(start + chunkSizeBytes, file.size);
+            const chunk = file.slice(start, end);
             
-            // Generate synthetic result
-            return generateMockSegment(chunkIndex, state.diarization);
-        };
+            const base64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(chunk);
+            });
 
-        // Typing effect for transcript text
-        async function typeText(element, htmlContent) {
-            element.insertAdjacentHTML('beforeend', htmlContent);
-            element.scrollTop = element.scrollHeight;
+            const payload = {
+                model: MODEL_API_MAP[modelKey].model,
+                apiKey: apiKey,
+                chunk: base64,
+                format: file.type,
+                diarization: state.diarization
+            };
+
+            const response = await fetch(MODEL_API_MAP[modelKey].endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Transcription failed');
+            }
+
+            const data = await response.json();
+            return {
+                text: data.speaker ? `<span class="speaker-tag">${data.speaker}</span> ${data.text} ` : `${data.text} `,
+                rawText: data.speaker ? `${data.speaker} ${data.text} ` : `${data.text} `
+            };
         }
 
         async function processFile(file, index) {
             const fileId = `file-${Date.now()}-${index}`;
-            const chunkSizeBytes = state.chunkSizeMB * 1024 * 1024;
-            const totalChunks = Math.ceil(file.size / chunkSizeBytes);
-            
-            log(`Starting ${file.name} - ${totalChunks} chunk(s) calculated.`);
+            const totalChunks = Math.ceil(file.size / (state.chunkSizeMB * 1024 * 1024));
+            log(`Starting ${file.name} - ${totalChunks} chunk(s).`);
 
-            // Create UI Block for this file
             const block = document.createElement('div');
             block.className = 'transcription-block';
             block.id = fileId;
-            
             block.innerHTML = `
                 <div class="block-header">
                     <div>
@@ -762,9 +707,7 @@
                             <span>Progress</span>
                             <span id="pct-${fileId}">0%</span>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="bar-${fileId}"></div>
-                        </div>
+                        <div class="progress-bar"><div class="progress-fill" id="bar-${fileId}"></div></div>
                     </div>
                 </div>
                 <div class="transcript-content" id="content-${fileId}"></div>
@@ -774,44 +717,29 @@
                     <button class="tertiary-btn download-md" data-id="${fileId}">Export .md</button>
                 </div>
             `;
-            
             elements.transcriptionContainer.appendChild(block);
-            
+
             const pctText = document.getElementById(`pct-${fileId}`);
             const barFill = document.getElementById(`bar-${fileId}`);
             const contentArea = document.getElementById(`content-${fileId}`);
+            state.results[fileId] = { filename: file.name, rawText: '' };
 
-            state.results[fileId] = {
-                filename: file.name,
-                rawText: ''
-            };
-
-            // Process Chunks
-            for(let i = 0; i < totalChunks; i++) {
-                const start = i * chunkSizeBytes;
-                const end = Math.min(start + chunkSizeBytes, file.size);
-                const chunk = file.slice(start, end);
-                
-                log(`[${file.name}] Processing Chunk ${i+1}/${totalChunks} (${(chunk.size/1024/1024).toFixed(2)} MB)...`);
-                
+            for (let i = 0; i < totalChunks; i++) {
+                log(`[${file.name}] Processing Chunk ${i+1}/${totalChunks} ...`);
                 try {
-                    const result = await simulateApiCall(file, i, totalChunks, fileId, state.model, state.apiKey);
-                    
-                    await typeText(contentArea, result.text);
+                    const result = await sendChunkForTranscription(file, i, totalChunks, fileId, state.model, state.apiKey);
+                    contentArea.insertAdjacentHTML('beforeend', result.text);
+                    contentArea.scrollTop = contentArea.scrollHeight;
                     state.results[fileId].rawText += result.rawText;
-
                     const progress = Math.round(((i + 1) / totalChunks) * 100);
                     pctText.textContent = `${progress}%`;
                     barFill.style.width = `${progress}%`;
-                    
                     log(`[${file.name}] Chunk ${i+1} completed.`, 'success');
                 } catch (err) {
                     log(`[${file.name}] Error on chunk ${i+1}: ${err.message}`, 'error');
                 }
             }
-
             log(`Finished processing: ${file.name}`, 'success');
-            
             bindExportActions(block, fileId);
         }
 
@@ -819,15 +747,13 @@
             const copyBtn = block.querySelector('.copy-btn');
             const txtBtn = block.querySelector('.download-txt');
             const mdBtn = block.querySelector('.download-md');
-
             copyBtn.addEventListener('click', () => {
                 navigator.clipboard.writeText(state.results[fileId].rawText).then(() => {
-                    const originalText = copyBtn.textContent;
+                    const original = copyBtn.textContent;
                     copyBtn.textContent = "Copied!";
-                    setTimeout(() => copyBtn.textContent = originalText, 2000);
+                    setTimeout(() => copyBtn.textContent = original, 2000);
                 });
             });
-
             txtBtn.addEventListener('click', () => exportFile(fileId, 'txt'));
             mdBtn.addEventListener('click', () => exportFile(fileId, 'md'));
         }
@@ -835,11 +761,7 @@
         function exportFile(fileId, format) {
             const data = state.results[fileId];
             let content = data.rawText;
-            
-            if(format === 'md') {
-                content = `# Transcription: ${data.filename}\n\n*Generated by Aura Engine*\n\n---\n\n${content}`;
-            }
-
+            if (format === 'md') content = `# Transcription: ${data.filename}\n\n*Generated by Aura Engine*\n\n---\n\n${content}`;
             const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -852,55 +774,38 @@
             log(`Exported ${data.filename} as .${format}`);
         }
 
-        // Orchestrator
         elements.startBtn.addEventListener('click', async () => {
             if (state.files.length === 0) return;
-            
             if (!state.apiKey) {
-                log('Warning: No API Key provided. Running in synthetic intelligence mode.', 'warn');
+                log('Error: API Key required for live processing.', 'error');
+                return;
             }
-
-            // Transition UI
             state.isProcessing = true;
             elements.startBtn.disabled = true;
             elements.startBtn.innerHTML = `<span style="animation: pulse 1s infinite;">Processing Stream...</span>`;
-            
             elements.uploadView.style.display = 'none';
             elements.processingView.style.display = 'flex';
-            elements.transcriptionContainer.innerHTML = ''; // clear previous
-
+            elements.transcriptionContainer.innerHTML = '';
             log('Initiating concurrent processing streams...');
-
-            // Process all files concurrently
-            const promises = state.files.map((file, index) => processFile(file, index));
-            
+            const promises = state.files.map((file, idx) => processFile(file, idx));
             await Promise.all(promises);
-
             log('All streams completed successfully.', 'success');
             elements.startBtn.style.display = 'none';
             elements.resetBtn.classList.remove('hidden');
         });
 
-        // Reset App
         elements.resetBtn.addEventListener('click', () => {
             state.files = [];
             state.isProcessing = false;
             state.results = {};
-            
             elements.uploadView.style.display = 'flex';
             elements.processingView.style.display = 'none';
-            
             elements.startBtn.style.display = 'flex';
-            elements.startBtn.innerHTML = `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                Initialize Processing
-            `;
+            elements.startBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Initialize Processing`;
             elements.resetBtn.classList.add('hidden');
-            
             updateFileList();
             log('System reset. Ready for new batch.');
         });
-
     </script>
 </body>
 </html>
