@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aura | Enterprise Audio Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #030303;
+            --surface-1: rgba(255, 255, 255, 0.03);
+            --surface-2: rgba(255, 255, 255, 0.05);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --text-primary: #ededed;
+            --text-secondary: #888888;
+            --accent: #ffffff;
+            --accent-glow: rgba(255, 255, 255, 0.15);
+            --success: #32ff7e;
+            --danger: #ff4d4d;
+            
+            --font-sans: 'Inter', sans-serif;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 24px;
+            
+            --transition-smooth: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            --transition-fast: 0.2s ease-out;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            overflow-x: hidden;
+            overscroll-behavior: none;
+        }
+
+        /* Ambient Glow that follows mouse */
+        #ambient-glow {
+            position: fixed;
+            top: 0; left: 0;
+            width: 600px; height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0) 70%);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 0;
+            transition: opacity var(--transition-smooth);
+        }
+
+        /* Layout */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+                height: auto;
+                min-height: 100vh;
+            }
+        }
+
+        /* Left Canvas */
+        .canvas-area {
+            position: relative;
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-subtle);
+            overflow-y: auto;
+        }
+
+        .header {
+            margin-bottom: 4rem;
+        }
+        
+        .header h1 {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: 2rem;
+            letter-spacing: -0.04em;
+        }
+        .header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Dropzone */
+        .dropzone-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border: 1px dashed var(--border-subtle);
+            border-radius: var(--radius-lg);
+            background: var(--surface-1);
+            backdrop-filter: blur(20px);
+            transition: all var(--transition-smooth);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            min-height: 300px;
+        }
+
+        .dropzone-container:hover, .dropzone-container.dragover {
+            border-color: rgba(255,255,255,0.3);
+            background: var(--surface-2);
+        }
+
+        .dropzone-content {
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .dropzone-content svg {
+            width: 48px; height: 48px;
+            opacity: 0.5;
+            margin-bottom: 1rem;
+            transition: opacity var(--transition-fast);
+        }
+        
+        .dropzone-container:hover .dropzone-content svg { opacity: 1; }
+
+        .dropzone-content h3 {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .dropzone-content p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        input[type="file"] { display: none; }
+
+        /* File List */
+        .file-list {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: var(--surface-1);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .file-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .file-name { font-weight: 500; font-size: 0.95rem; }
+        .file-meta { color: var(--text-secondary); font-size: 0.8rem; font-family: var(--font-mono); }
+
+        .remove-file {
+            background: none; border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0.25rem 0.5rem;
+            transition: color var(--transition-fast);
+        }
+        .remove-file:hover { color: var(--danger); }
+
+        /* Right Panel */
+        .control-panel {
+            padding: 3rem 2rem;
+            background: rgba(10, 10, 10, 0.6);
+            backdrop-filter: blur(40px);
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+            overflow-y: auto;
+        }
+
+        .panel-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .panel-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        input[type="text"], input[type="password"], select, .slider-container input {
+            width: 100%;
+            background: var(--surface-1);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            padding: 0.875rem 1rem;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color var(--transition-fast);
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus, select:focus {
+            border-color: rgba(255,255,255,0.3);
+        }
+        
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='white' stroke-opacity='0.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .slider-val {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 4ch;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px; width: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px;
+            cursor: pointer;
+            background: var(--surface-2);
+            border-radius: 2px;
+        }
+
+        .primary-btn {
+            background: var(--accent);
+            color: var(--bg-base);
+            border: none;
+            padding: 1rem;
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .primary-btn:hover {
+            transform: scale(0.98);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+        
+        .primary-btn:disabled {
+            background: var(--surface-2);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .tertiary-btn {
+            background: none;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .tertiary-btn:hover {
+            background: var(--surface-1);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        /* Processing & Results UI */
+        .processing-view {
+            display: none;
+            flex-direction: column;
+            gap: 2rem;
+            height: 100%;
+        }
+
+        .transcription-block {
+            background: var(--surface-1);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        .block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .block-title {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: 1.2rem;
+        }
+
+        .chunk-progress-container {
+            width: 150px;
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background: var(--surface-2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .transcript-content {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #d1d1d1;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+
+        .transcript-content::-webkit-scrollbar { width: 4px; }
+        .transcript-content::-webkit-scrollbar-track { background: transparent; }
+        .transcript-content::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 2px; }
+
+        .speaker-tag {
+            display: inline-block;
+            background: var(--surface-2);
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            color: var(--accent);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Animations */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+        .terminal-log {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: #000;
+            padding: 1rem;
+            border-radius: var(--radius-sm);
+            height: 150px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .log-entry { animation: fadeIn 0.2s ease forwards; }
+        .log-entry.success { color: var(--success); }
+        .log-entry.error { color: var(--danger); }
+        .log-entry.warn { color: #f1c40f; }
+
+        /* Custom Scrollbar for whole page */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-subtle); }
+
+    </style>
+</head>
+<body>
+
+    <div id="ambient-glow"></div>
+
+    <div class="app-container">
+        <!-- Left Canvas Area -->
+        <main class="canvas-area">
+            <header class="header">
+                <h1>Aura.</h1>
+                <p>Enterprise Audio Intelligence & Synthesis</p>
+            </header>
+
+            <!-- Upload View -->
+            <div id="upload-view" style="display: flex; flex-direction: column; flex-grow: 1;">
+                <div class="dropzone-container" id="dropzone" role="button" tabindex="0" aria-label="Upload audio or video files">
+                    <div class="dropzone-content">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <h3>Drop audio/video files</h3>
+                        <p>MP3, WAV, MP4, MKV (Unlimited size via local chunking)</p>
+                    </div>
+                    <input type="file" id="file-input" multiple accept="audio/*,video/*">
+                </div>
+                
+                <div class="file-list" id="file-list"></div>
+            </div>
+
+            <!-- Processing / Results View -->
+            <div id="processing-view" class="processing-view">
+                <div class="header" style="margin-bottom: 2rem;">
+                    <h1 style="font-size: 1.5rem;">Intelligence Feed</h1>
+                    <p>Live processing and transcription</p>
+                </div>
+                
+                <div id="transcription-container" style="display: flex; flex-direction: column; gap: 2rem;">
+                    <!-- Transcription blocks injected here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Control Panel -->
+        <aside class="control-panel">
+            <div class="panel-section">
+                <div class="panel-title">Model Selection</div>
+                <div class="input-group">
+                    <select id="model-select">
+                        <option value="sonnet-4-6">Claude 4.6 Sonnet (Optimized)</option>
+                        <option value="opus-4-6">Claude 4.6 Opus (Deep Analysis)</option>
+                        <option value="gpt-5-3-instant">ChatGPT 5.3 Instant</option>
+                        <option value="gpt-5-4-thinking">ChatGPT 5.4-Thinking</option>
+                        <option value="deepseek-v3">Deepseek V3 (Multimodal & Reasoning)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">API Configuration</div>
+                <div class="input-group">
+                    <label>Provider API Key</label>
+                    <input type="password" id="api-key" placeholder="sk-..." autocomplete="off">
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">Processing Engine</div>
+                <div class="input-group">
+                    <label>Chunk Size (MB)</label>
+                    <div class="slider-container">
+                        <input type="range" id="chunk-size" min="1" max="50" value="25" step="1">
+                        <span class="slider-val" id="chunk-val">25</span>
+                    </div>
+                </div>
+                <div class="input-group" style="flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                    <input type="checkbox" id="diarization" checked style="accent-color: var(--accent);">
+                    <label for="diarization">Enable Speaker Diarization</label>
+                </div>
+            </div>
+
+            <div class="panel-section" style="margin-top: auto;">
+                <button class="primary-btn" id="start-btn" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    Initialize Processing
+                </button>
+                <button class="tertiary-btn hidden" id="reset-btn" style="margin-top: 1rem; width: 100%;">
+                    Process New Batch
+                </button>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">System Logs</div>
+                <div class="terminal-log" id="system-logs">
+                    <div class="log-entry">Aura System Initialized.</div>
+                    <div class="log-entry">Awaiting input...</div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // Core State
+        const state = {
+            files: [],
+            isProcessing: false,
+            apiKey: '',
+            model: '', // will be set from the select element
+            chunkSizeMB: 25,
+            diarization: true,
+            results: {}
+        };
+
+        // DOM Elements
+        const elements = {
+            glow: document.getElementById('ambient-glow'),
+            dropzone: document.getElementById('dropzone'),
+            fileInput: document.getElementById('file-input'),
+            fileList: document.getElementById('file-list'),
+            uploadView: document.getElementById('upload-view'),
+            processingView: document.getElementById('processing-view'),
+            transcriptionContainer: document.getElementById('transcription-container'),
+            modelSelect: document.getElementById('model-select'),
+            apiKeyInput: document.getElementById('api-key'),
+            chunkSizeSlider: document.getElementById('chunk-size'),
+            chunkVal: document.getElementById('chunk-val'),
+            diarizationCheck: document.getElementById('diarization'),
+            startBtn: document.getElementById('start-btn'),
+            resetBtn: document.getElementById('reset-btn'),
+            logs: document.getElementById('system-logs')
+        };
+
+        // Synchronize model state with the actual selected option
+        state.model = elements.modelSelect.value;
+
+        // --- UI Interactions & Visuals ---
+
+        // Ambient Glow Tracking
+        document.addEventListener('mousemove', (e) => {
+            elements.glow.style.transform = `translate(${e.clientX - 300}px, ${e.clientY - 300}px)`;
+        });
+
+        // Logger
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString([], {hour12: false});
+            entry.textContent = `[${time}] ${message}`;
+            elements.logs.appendChild(entry);
+            elements.logs.scrollTop = elements.logs.scrollHeight;
+        }
+
+        // --- Settings Event Listeners ---
+
+        elements.modelSelect.addEventListener('change', (e) => { state.model = e.target.value; log(`Model set to ${state.model}`); });
+        elements.apiKeyInput.addEventListener('input', (e) => { state.apiKey = e.target.value; });
+        elements.chunkSizeSlider.addEventListener('input', (e) => {
+            state.chunkSizeMB = parseInt(e.target.value);
+            elements.chunkVal.textContent = state.chunkSizeMB;
+        });
+        elements.diarizationCheck.addEventListener('change', (e) => { state.diarization = e.target.checked; });
+
+        // --- Drag & Drop / File Handling ---
+
+        function updateFileList() {
+            elements.fileList.innerHTML = '';
+            state.files.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                
+                item.innerHTML = `
+                    <div class="file-info">
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-meta">${sizeMB} MB • ${file.type || 'Unknown format'}</span>
+                    </div>
+                    <button class="remove-file" data-index="${index}" aria-label="Remove ${file.name}">×</button>
+                `;
+                elements.fileList.appendChild(item);
+            });
+
+            // Bind remove buttons
+            document.querySelectorAll('.remove-file').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.dataset.index);
+                    log(`Removed file: ${state.files[idx].name}`);
+                    state.files.splice(idx, 1);
+                    updateFileList();
+                    validateState();
+                });
+            });
+
+            validateState();
+        }
+
+        function validateState() {
+            if (state.files.length > 0 && !state.isProcessing) {
+                elements.startBtn.disabled = false;
+            } else {
+                elements.startBtn.disabled = true;
+            }
+        }
+
+        function handleFiles(files) {
+            const validFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || f.type.startsWith('video/'));
+            if(validFiles.length !== files.length) {
+                log('Some files ignored. Only audio/video supported.', 'warn');
+            }
+            state.files = [...state.files, ...validFiles];
+            validFiles.forEach(f => log(`Queued: ${f.name}`));
+            updateFileList();
+        }
+
+        // Dropzone events – including keyboard activation
+        elements.dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.dropzone.classList.add('dragover');
+        });
+
+        elements.dropzone.addEventListener('dragleave', () => {
+            elements.dropzone.classList.remove('dragover');
+        });
+
+        elements.dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.dropzone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        elements.dropzone.addEventListener('click', () => {
+            elements.fileInput.click();
+        });
+
+        elements.dropzone.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                elements.fileInput.click();
+            }
+        });
+
+        elements.fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+            e.target.value = ''; // Reset
+        });
+
+        // --- Processing Logic & Synthetic Intelligence Mock ---
+
+        // Mock transcription responses
+        const mockResponses = {
+            general: [
+                "The systemic anomalies detected in quadrant four represent a substantial shift.",
+                "Moving forward, we need to optimize our integration strategies at scale.",
+                "If we cross-reference the data structures, the latency drops by roughly forty percent.",
+                "Our heuristic analysis confirms the initial hypothesis.",
+                "Let's break this down into actionable chunks for the engineering team."
+            ]
+        };
+
+        const generateMockSegment = (chunkIndex, isDiarized) => {
+            const txt = mockResponses.general[Math.floor(Math.random() * mockResponses.general.length)];
+            const speaker = isDiarized ? `[SPEAKER ${Math.floor(Math.random() * 3) + 1}]` : '';
+            return {
+                text: `${speaker ? `<span class="speaker-tag">${speaker}</span>` : ''} ${txt} `,
+                rawText: `${speaker ? speaker : ''} ${txt} `
+            };
+        };
+
+        const simulateApiCall = async (file, chunkIndex, totalChunks, containerId, model, key) => {
+            // Simulate network latency (2-4 seconds per chunk)
+            const delay = Math.random() * 2000 + 2000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            // Generate synthetic result
+            return generateMockSegment(chunkIndex, state.diarization);
+        };
+
+        // Typing effect for transcript text
+        async function typeText(element, htmlContent) {
+            element.insertAdjacentHTML('beforeend', htmlContent);
+            element.scrollTop = element.scrollHeight;
+        }
+
+        async function processFile(file, index) {
+            const fileId = `file-${Date.now()}-${index}`;
+            const chunkSizeBytes = state.chunkSizeMB * 1024 * 1024;
+            const totalChunks = Math.ceil(file.size / chunkSizeBytes);
+            
+            log(`Starting ${file.name} - ${totalChunks} chunk(s) calculated.`);
+
+            // Create UI Block for this file
+            const block = document.createElement('div');
+            block.className = 'transcription-block';
+            block.id = fileId;
+            
+            block.innerHTML = `
+                <div class="block-header">
+                    <div>
+                        <div class="block-title">${file.name}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Model: ${state.model.toUpperCase()} | Engine: Chunking via Web API
+                        </div>
+                    </div>
+                    <div class="chunk-progress-container">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+                            <span>Progress</span>
+                            <span id="pct-${fileId}">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="bar-${fileId}"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="transcript-content" id="content-${fileId}"></div>
+                <div class="actions">
+                    <button class="tertiary-btn copy-btn" data-id="${fileId}">Copy Text</button>
+                    <button class="tertiary-btn download-txt" data-id="${fileId}">Export .txt</button>
+                    <button class="tertiary-btn download-md" data-id="${fileId}">Export .md</button>
+                </div>
+            `;
+            
+            elements.transcriptionContainer.appendChild(block);
+            
+            const pctText = document.getElementById(`pct-${fileId}`);
+            const barFill = document.getElementById(`bar-${fileId}`);
+            const contentArea = document.getElementById(`content-${fileId}`);
+
+            state.results[fileId] = {
+                filename: file.name,
+                rawText: ''
+            };
+
+            // Process Chunks
+            for(let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSizeBytes;
+                const end = Math.min(start + chunkSizeBytes, file.size);
+                const chunk = file.slice(start, end);
+                
+                log(`[${file.name}] Processing Chunk ${i+1}/${totalChunks} (${(chunk.size/1024/1024).toFixed(2)} MB)...`);
+                
+                try {
+                    const result = await simulateApiCall(file, i, totalChunks, fileId, state.model, state.apiKey);
+                    
+                    await typeText(contentArea, result.text);
+                    state.results[fileId].rawText += result.rawText;
+
+                    const progress = Math.round(((i + 1) / totalChunks) * 100);
+                    pctText.textContent = `${progress}%`;
+                    barFill.style.width = `${progress}%`;
+                    
+                    log(`[${file.name}] Chunk ${i+1} completed.`, 'success');
+                } catch (err) {
+                    log(`[${file.name}] Error on chunk ${i+1}: ${err.message}`, 'error');
+                }
+            }
+
+            log(`Finished processing: ${file.name}`, 'success');
+            
+            bindExportActions(block, fileId);
+        }
+
+        function bindExportActions(block, fileId) {
+            const copyBtn = block.querySelector('.copy-btn');
+            const txtBtn = block.querySelector('.download-txt');
+            const mdBtn = block.querySelector('.download-md');
+
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(state.results[fileId].rawText).then(() => {
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = "Copied!";
+                    setTimeout(() => copyBtn.textContent = originalText, 2000);
+                });
+            });
+
+            txtBtn.addEventListener('click', () => exportFile(fileId, 'txt'));
+            mdBtn.addEventListener('click', () => exportFile(fileId, 'md'));
+        }
+
+        function exportFile(fileId, format) {
+            const data = state.results[fileId];
+            let content = data.rawText;
+            
+            if(format === 'md') {
+                content = `# Transcription: ${data.filename}\n\n*Generated by Aura Engine*\n\n---\n\n${content}`;
+            }
+
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transcript-${data.filename}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            log(`Exported ${data.filename} as .${format}`);
+        }
+
+        // Orchestrator
+        elements.startBtn.addEventListener('click', async () => {
+            if (state.files.length === 0) return;
+            
+            if (!state.apiKey) {
+                log('Warning: No API Key provided. Running in synthetic intelligence mode.', 'warn');
+            }
+
+            // Transition UI
+            state.isProcessing = true;
+            elements.startBtn.disabled = true;
+            elements.startBtn.innerHTML = `<span style="animation: pulse 1s infinite;">Processing Stream...</span>`;
+            
+            elements.uploadView.style.display = 'none';
+            elements.processingView.style.display = 'flex';
+            elements.transcriptionContainer.innerHTML = ''; // clear previous
+
+            log('Initiating concurrent processing streams...');
+
+            // Process all files concurrently
+            const promises = state.files.map((file, index) => processFile(file, index));
+            
+            await Promise.all(promises);
+
+            log('All streams completed successfully.', 'success');
+            elements.startBtn.style.display = 'none';
+            elements.resetBtn.classList.remove('hidden');
+        });
+
+        // Reset App
+        elements.resetBtn.addEventListener('click', () => {
+            state.files = [];
+            state.isProcessing = false;
+            state.results = {};
+            
+            elements.uploadView.style.display = 'flex';
+            elements.processingView.style.display = 'none';
+            
+            elements.startBtn.style.display = 'flex';
+            elements.startBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Initialize Processing
+            `;
+            elements.resetBtn.classList.add('hidden');
+            
+            updateFileList();
+            log('System reset. Ready for new batch.');
+        });
+
+    </script>
+</body>
+</html>
